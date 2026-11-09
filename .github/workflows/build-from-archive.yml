@@ -4,7 +4,8 @@ on:
     branches:
       - main
     paths:
-      - 'NIGHTFRAME_V41.ready'
+      - 'NIGHTFRAME_V43_Source.parts/**'
+      - '.github/workflows/build-from-archive.yml'
 permissions:
   contents: write
 jobs:
@@ -13,15 +14,19 @@ jobs:
     steps:
       - name: Checkout source payload
         uses: actions/checkout@v4
-      - name: Reconstruct V41 source ZIP
+      - name: Reconstruct and verify V43 source archive
         shell: pwsh
         run: |
-          $parts = Get-ChildItem -LiteralPath "$env:GITHUB_WORKSPACE/NIGHTFRAME_V41_Source.parts" -Filter '*.b64' | Sort-Object Name
-          if ($parts.Count -ne 17) { throw "Esperadas 17 partes base64; encontradas $($parts.Count)." }
+          $parts = Get-ChildItem -LiteralPath "$env:GITHUB_WORKSPACE/NIGHTFRAME_V43_Source.parts" -Filter '*.b64' | Sort-Object Name
+          if ($parts.Count -ne 8) { throw "Esperadas 8 partes base64; encontradas $($parts.Count)." }
           $encoded = [string]::Concat(($parts | ForEach-Object { (Get-Content -LiteralPath $_.FullName -Raw).Trim() }))
           $bytes = [Convert]::FromBase64String($encoded)
-          [IO.File]::WriteAllBytes("$env:GITHUB_WORKSPACE/NIGHTFRAME_V41_Source.zip", $bytes)
-          Expand-Archive -LiteralPath "$env:GITHUB_WORKSPACE/NIGHTFRAME_V41_Source.zip" -DestinationPath $env:GITHUB_WORKSPACE -Force
+          $archive = "$env:GITHUB_WORKSPACE/NIGHTFRAME_V43_Source.zip"
+          [IO.File]::WriteAllBytes($archive, $bytes)
+          $expected = '9acd625645e10673956da718ffdc724e21790484900af6be2c16bc004dd954d2'
+          $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "SHA-256 do arquivo-fonte divergente: $actual" }
+          Expand-Archive -LiteralPath $archive -DestinationPath $env:GITHUB_WORKSPACE -Force
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
