@@ -4,18 +4,24 @@ on:
     branches:
       - main
     paths:
-      - 'NIGHTFRAME_V41_Source.zip'
+      - 'NIGHTFRAME_V41.ready'
 permissions:
   contents: write
 jobs:
   release:
     runs-on: windows-latest
     steps:
-      - name: Checkout source archive
+      - name: Checkout source payload
         uses: actions/checkout@v4
-      - name: Extract NIGHTFRAME source
+      - name: Reconstruct V41 source ZIP
         shell: pwsh
-        run: Expand-Archive -LiteralPath "$env:GITHUB_WORKSPACE/NIGHTFRAME_V41_Source.zip" -DestinationPath $env:GITHUB_WORKSPACE -Force
+        run: |
+          $parts = Get-ChildItem -LiteralPath "$env:GITHUB_WORKSPACE/NIGHTFRAME_V41_Source.parts" -Filter '*.b64' | Sort-Object Name
+          if ($parts.Count -ne 17) { throw "Esperadas 17 partes base64; encontradas $($parts.Count)." }
+          $encoded = [string]::Concat(($parts | ForEach-Object { (Get-Content -LiteralPath $_.FullName -Raw).Trim() }))
+          $bytes = [Convert]::FromBase64String($encoded)
+          [IO.File]::WriteAllBytes("$env:GITHUB_WORKSPACE/NIGHTFRAME_V41_Source.zip", $bytes)
+          Expand-Archive -LiteralPath "$env:GITHUB_WORKSPACE/NIGHTFRAME_V41_Source.zip" -DestinationPath $env:GITHUB_WORKSPACE -Force
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
