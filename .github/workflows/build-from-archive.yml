@@ -1,0 +1,33 @@
+name: Build and publish NIGHTFRAME Windows installer
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'NIGHTFRAME_V41_Source.zip'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout source archive
+        uses: actions/checkout@v4
+      - name: Extract NIGHTFRAME source
+        shell: pwsh
+        run: Expand-Archive -LiteralPath "$env:GITHUB_WORKSPACE/NIGHTFRAME_V41_Source.zip" -DestinationPath $env:GITHUB_WORKSPACE -Force
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prepare FFmpeg
+        shell: pwsh
+        run: ./SETUP_DEPENDENCIES.ps1
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run automated tests
+        run: npm test
+      - name: Build NSIS installer and publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist:win -- --publish always
